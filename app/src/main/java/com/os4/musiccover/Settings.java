@@ -12,6 +12,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
 
+import com.os4.musiccover.lyrics.LyricPace;
 import com.os4.musiccover.lyrics.LyricStyle;
 import com.os4.musiccover.lyrics.LyricAppearance;
 
@@ -1050,6 +1051,25 @@ public final class Settings {
             .clamp(v -> v < 0 ? 0 : Math.min(v, 2))
             .file("lyricalign", () -> String.valueOf(Settings.LYRIC_ALIGN.get()),
                     v -> Settings.LYRIC_ALIGN.set(Settings.LYRIC_ALIGN.checked(Integer.parseInt(v))));
+
+    /**
+     * The lyric animation's frame budget (30/60/90/120 fps).
+     *
+     * Kept in {@link LyricPace} rather than in a Settings field: the frame loop reads it from the
+     * module process with no Context, and a change has to land on the very next frame. See
+     * LyricPace for why the budget exists at all.
+     */
+    public static final Int LYRIC_FPS = new Int(SettingSpec.LYRIC_FPS)
+            .op("lyricfps", "v", Absent.DEFAULT).absent(60)
+            .apply((c, v) -> {
+                LyricPace.fps = v;
+                // One line so `adb logcat | grep MCProbe` proves the op landed; the frame loop
+                // itself stays silent (it runs per frame).
+                Xp.log("[" + "MCProbe] lyricfps=" + v);
+                return true;
+            })
+            .file("lyricfps", () -> String.valueOf(LyricPace.fps),
+                    v -> LyricPace.fps = Integer.parseInt(v));
 
     /**
      * Immutable snapshot: the UI, renderer and state loader all use the same validated values. The two
