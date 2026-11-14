@@ -8,10 +8,9 @@ name: Build APK (fork)
 #   2. 推任何提交、打 tag，或在 Actions 页面手动 Run workflow
 #   3. 构建完在该次运行的 Artifacts 里下载 HyperMusicCover-apk
 #
-# 签名：仓库的 build.gradle.kts 支持环境变量 SIGNING_STORE_FILE 等；不配置时按 debug 签名出包
-# （能装、能跑，只是不能覆盖签名不同的正式版）。要正式签名就在仓库 Secrets 里加：
-#   SIGNING_STORE_FILE_BASE64  keystore 的 base64（`base64 -w0 release.jks`）
-#   SIGNING_STORE_PASSWORD / SIGNING_KEY_ALIAS / SIGNING_KEY_PASSWORD
+# 签名：用仓库里自带的 ci/debug.keystore（标准 Android debug key），
+# 这样每次 CI 构建签名一致，也能直接覆盖安装你本机现有的构建。
+# 换成自己的正式 key：把 keystore 放到 ci/ 下，改 Build 步骤里那四个环境变量。
 on:
   push:
     branches: ['**']
@@ -59,19 +58,17 @@ jobs:
           key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties', 'gradle/libs.versions.toml') }}
           restore-keys: gradle-${{ runner.os }}-
 
-      - name: Decode keystore (optional)
-        if: ${{ env.SIGNING_STORE_FILE_BASE64 != '' }}
-        env:
-          SIGNING_STORE_FILE_BASE64: ${{ secrets.SIGNING_STORE_FILE_BASE64 }}
-        run: |
-          echo "$SIGNING_STORE_FILE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
-          echo "SIGNING_STORE_FILE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
 
       - name: Build release
         env:
-          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
-          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
-          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+          # 仓库里自带的 ci/debug.keystore：保证每次 CI 构建的签名一致，
+          # 也和你本机现有安装的签名相同 ⇒ 可以直接 `adb install -r` 覆盖升级。
+          # 这是标准 Android debug key（alias=androiddebugkey / 口令 android），不含真实发布身份；
+          # 要换成自己的正式 key，就在这里改成 secrets。
+          SIGNING_STORE_FILE: ci/debug.keystore
+          SIGNING_STORE_PASSWORD: android
+          SIGNING_KEY_ALIAS: androiddebugkey
+          SIGNING_KEY_PASSWORD: android
           # 版本号随构建递增：900000 + 运行序号，保证每次都能覆盖安装上一次的 CI 包
           # （仓库的 build.gradle.kts 读 -PmcVersionCode / -PmcVersionName）
           MC_CODE: ${{ github.run_number }}
