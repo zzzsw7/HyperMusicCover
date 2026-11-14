@@ -83,6 +83,10 @@ public final class CoverPush {
         pushArtToWallpaper(ctx, on, on ? AlbumArt.albumArt(ctx) : null);
     }
 
+
+    /** Last value handed to `hyperextreme_yield_cover`, so a push that changes nothing is not a write. */
+    private static boolean sYieldOn = false;
+
     private static void pushArtToWallpaper(Context ctx, boolean on, Bitmap art) {
         long t0 = android.os.SystemClock.uptimeMillis();
         // 保留壁纸: the wallpaper is the user's own throughout. Sent as the way out, so a cover
@@ -91,6 +95,20 @@ public final class CoverPush {
         // goes with it. The track key stays: it is what tells the next track change from this one.
         boolean keep = on && Main.keepsWallpaper();
         if (keep) on = false;
+        // HyperExtreme yield signal: cover mode on/off, so the spatial wallpaper layer can step
+        // aside under the cover art. Same channel as hypermusiccover_force_colon (SystemUI may
+        // write Settings.Global). Placed after the `keep` normalisation above: keeping the user's
+        // wallpaper means the art never reached the wallpaper, so nothing has to yield.
+        // Written only on a real change - every write wakes the module's ContentObserver, and
+        // this method runs on every art push, not just on entering or leaving cover mode.
+        if (sYieldOn != on) {
+            try {
+                android.provider.Settings.Global.putInt(
+                        ctx.getContentResolver(), "hyperextreme_yield_cover", on ? 1 : 0);
+                sYieldOn = on;
+            } catch (Throwable ignored) {
+            }
+        }
         Intent out = wallpaperIntent("art");
         out.putExtra("cardmode", Settings.COVER_STYLE.get().mode == CoverCardStyle.CARD);
         // The blur travels with the cover. A lyricblur broadcast is one shot - dropped, or
@@ -118,7 +136,12 @@ public final class CoverPush {
         // does not hold both ends of the fade - after its own restart, most of all. Never with
         // the display off: the frames would be composed and uploaded into a screen nobody is
         // looking at, and the clock is not springing either.
-        out.putExtra("fade", Settings.FADE_WALLPAPER.on() && Main.screenOn());
+        // No fade when leaving cover (on == false): HyperExtreme's spatial wallpaper layer is a
+        // child of this wallpaper leash and inherits its alpha, so a 370ms fade back to the system
+        // wallpaper drags our layer down with it - the user sees the system wallpaper come up and
+        // then jump to the spatial one. A hard cut on the way out lets the outer layer cover the
+        // leash in the same frame.
+        out.putExtra("fade", on && Settings.FADE_WALLPAPER.on() && Main.screenOn());
         if (!on) {
             MotionCover.onCoverOff();
             CoverCardLayer.clear();
