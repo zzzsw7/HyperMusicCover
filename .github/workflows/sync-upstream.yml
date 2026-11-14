@@ -78,7 +78,19 @@ jobs:
 
       - name: Push
         if: steps.merge.outputs.merged == 'true'
-        run: git push origin HEAD:${{ inputs.branch || 'main' }}
+        env:
+          TARGET: ${{ inputs.branch || 'main' }}
+        run: git push origin HEAD:"$TARGET"
+
+      # 用 GITHUB_TOKEN 推的提交**不会触发其它工作流**（GitHub 防递归），所以这里显式点一次构建。
+      - name: Trigger build
+        if: steps.merge.outputs.merged == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET: ${{ inputs.branch || 'main' }}
+        run: |
+          gh workflow run build-apk.yml --ref "$TARGET"
+          echo "已触发 Build APK（$TARGET）"
 
       - name: Summary
         run: |
