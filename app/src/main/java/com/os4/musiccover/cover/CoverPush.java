@@ -136,12 +136,7 @@ public final class CoverPush {
         // does not hold both ends of the fade - after its own restart, most of all. Never with
         // the display off: the frames would be composed and uploaded into a screen nobody is
         // looking at, and the clock is not springing either.
-        // No fade when leaving cover (on == false): HyperExtreme's spatial wallpaper layer is a
-        // child of this wallpaper leash and inherits its alpha, so a 370ms fade back to the system
-        // wallpaper drags our layer down with it - the user sees the system wallpaper come up and
-        // then jump to the spatial one. A hard cut on the way out lets the outer layer cover the
-        // leash in the same frame.
-        out.putExtra("fade", on && Settings.FADE_WALLPAPER.on() && Main.screenOn());
+        out.putExtra("fade", Settings.FADE_WALLPAPER.on() && Main.screenOn());
         if (!on) {
             MotionCover.onCoverOff();
             CoverCardLayer.clear();
