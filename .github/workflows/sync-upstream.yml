@@ -18,6 +18,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
 
 concurrency:
   group: sync-upstream
@@ -55,10 +56,25 @@ jobs:
           if git merge --no-edit upstream/main; then
             echo "merged=true" >> "$GITHUB_OUTPUT"
           else
-            echo "::error::与上游冲突，需要手动解决：git fetch upstream && git merge upstream/main"
+            # 冲突：中止合并，什么都不改；下面另开一个 PR 让网页上有「Resolve conflicts」按钮。
             git merge --abort || true
-            exit 1
+            echo "conflict=true" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Open conflict PR
+        if: steps.merge.outputs.conflict == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET: ${{ inputs.branch || 'main' }}
+        run: |
+          # 把上游当前状态推到一个临时分支，再向目标分支开 PR —— 这样 GitHub 会给出
+          # 网页端的「Resolve conflicts」，不用在本地折腾。
+          git push -f origin upstream/main:refs/heads/upstream-sync
+          gh pr create --base "$TARGET" --head upstream-sync \
+            --title "上游更新需要手动合并" \
+            --body "自动同步与 \`$TARGET\` 冲突，已中止合并，分支未改动。点下方 **Resolve conflicts** 解决后合并即可。" \
+            || gh pr list --head upstream-sync --json url -q '.[0].url' || true
+          echo "::warning::上游同步冲突，已开 PR 等待手动合并"
 
       - name: Push
         if: steps.merge.outputs.merged == 'true'
@@ -70,6 +86,6 @@ jobs:
             echo "### 上游同步"
             echo ""
             echo "- 分支：\`${{ inputs.branch || 'main' }}\`"
-            echo "- 结果：${{ steps.merge.outputs.merged == 'true' && '已合并上游更新' || '已是最新' }}"
+            echo "- 结果：${{ steps.merge.outputs.merged == 'true' && '已合并上游更新' || (steps.merge.outputs.conflict == 'true' && '**冲突，已开 PR 等待手动合并**' || '已是最新') }}"
             echo "- 上游最新提交：\`$(git rev-parse --short upstream/main)\`"
           } >> "$GITHUB_STEP_SUMMARY"
