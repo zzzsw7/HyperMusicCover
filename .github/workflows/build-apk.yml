@@ -72,7 +72,13 @@ jobs:
           SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
           SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
           SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
-        run: ./gradlew assembleRelease --no-daemon --stacktrace
+          # 版本号随构建递增：900000 + 运行序号，保证每次都能覆盖安装上一次的 CI 包
+          # （仓库的 build.gradle.kts 读 -PmcVersionCode / -PmcVersionName）
+          MC_CODE: ${{ github.run_number }}
+        run: |
+          ./gradlew assembleRelease --no-daemon --stacktrace \
+            -PmcVersionCode=$((900000 + MC_CODE)) \
+            -PmcVersionName="ci.$MC_CODE"
 
       - name: Collect APK
         run: |
