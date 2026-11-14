@@ -140,6 +140,8 @@ object ModuleBridge {
         val lyricsHdr: Boolean = SettingSpec.LYRIC_HDR.defBool,
         /** Draw each line's translation under it. On unless the user turns it off. */
         val lyricsTrans: Boolean = SettingSpec.LYRIC_TRANS.defBool,
+        /** Frame budget of the lyric animation, in fps (30/60/90/120). */
+        val lyricFps: Int = SettingSpec.LYRIC_FPS.defInt,
         /**
          * The full-screen AOD shows the OEM's own clock instead of the cover's small one. The
          * wire says it the other way round - `aodsmall`, "keep the small clock" - so this is the
@@ -585,6 +587,11 @@ object ModuleBridge {
     fun setLyricsTrans(context: Context, on: Boolean) =
         setting(context, SettingSpec.LYRIC_TRANS, on) {
             send(context, "lyrictrans") { putExtra("on", on) }
+        }
+
+    fun setLyricFps(context: Context, fps: Int) =
+        setting(context, SettingSpec.LYRIC_FPS, fps) {
+            send(context, "lyricfps") { putExtra("v", fps) }
         }
 
     fun setAodBigClock(context: Context, on: Boolean) =
@@ -1137,6 +1144,7 @@ object ModuleBridge {
             lyricsHdr = b.bool(SettingSpec.LYRIC_HDR),
             // Defaults the other way: this one is on for anyone whose module predates the key.
             lyricsTrans = b.bool(SettingSpec.LYRIC_TRANS),
+            lyricFps = b.int(SettingSpec.LYRIC_FPS),
             // The module says whether it keeps its own clock; the row says whether the big one
             // is wanted, so the answer is inverted here (see State.aodBigClock).
             aodBigClock = !b.bool(SettingSpec.AOD_SMALL),
