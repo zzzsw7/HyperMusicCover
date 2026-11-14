@@ -1,6 +1,6 @@
 name: Sync upstream
 
-# 把上游（zyl6932/HyperMusicCover）的更新合并进本 fork 的 `hybrid` 分支（= 原版 + 本仓库的改动），
+# 把上游（zyl6932/HyperMusicCover）的更新合并进本 fork 的 `main` 分支（= 原版 + 本仓库的改动），
 # 合并成功后 build-apk.yml 会自动重新构建，Artifacts 里就是「最新原版 + 本地改动」的包。
 #
 # 冲突时这个工作流会失败（GitHub 也会发邮件），这时在 GitHub 网页上或本地手动解决一次即可，
@@ -12,9 +12,9 @@ on:
   workflow_dispatch:
     inputs:
       branch:
-        description: '要同步的分支（默认 hybrid）'
+        description: '要同步的分支（默认 main）'
         required: false
-        default: hybrid
+        default: main
 
 permissions:
   contents: write
@@ -29,7 +29,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.branch || 'hybrid' }}
+          ref: ${{ inputs.branch || 'main' }}
           fetch-depth: 0
           # 用内置 token；fork 的 GITHUB_TOKEN 默认对自身仓库可写（见 Settings → Actions → Workflow permissions）
           token: ${{ github.token }}
@@ -62,14 +62,14 @@ jobs:
 
       - name: Push
         if: steps.merge.outputs.merged == 'true'
-        run: git push origin HEAD:${{ inputs.branch || 'hybrid' }}
+        run: git push origin HEAD:${{ inputs.branch || 'main' }}
 
       - name: Summary
         run: |
           {
             echo "### 上游同步"
             echo ""
-            echo "- 分支：\`${{ inputs.branch || 'hybrid' }}\`"
+            echo "- 分支：\`${{ inputs.branch || 'main' }}\`"
             echo "- 结果：${{ steps.merge.outputs.merged == 'true' && '已合并上游更新' || '已是最新' }}"
             echo "- 上游最新提交：\`$(git rev-parse --short upstream/main)\`"
           } >> "$GITHUB_STEP_SUMMARY"
