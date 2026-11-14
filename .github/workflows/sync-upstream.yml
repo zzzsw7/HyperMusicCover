@@ -1,0 +1,75 @@
+name: Sync upstream
+
+# 把上游（zyl6932/HyperMusicCover）的更新合并进本 fork 的 `hybrid` 分支（= 原版 + 本仓库的改动），
+# 合并成功后 build-apk.yml 会自动重新构建，Artifacts 里就是「最新原版 + 本地改动」的包。
+#
+# 冲突时这个工作流会失败（GitHub 也会发邮件），这时在 GitHub 网页上或本地手动解决一次即可，
+# 解决后点 "Re-run jobs"。没有冲突时会直接快进/合并提交，无需人工。
+on:
+  schedule:
+    # 每天 03:17 UTC（北京时间 11:17）跑一次；GitHub 的调度可能延迟几分钟。
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: '要同步的分支（默认 hybrid）'
+        required: false
+        default: hybrid
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-upstream
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch || 'hybrid' }}
+          fetch-depth: 0
+          # 用内置 token；fork 的 GITHUB_TOKEN 默认对自身仓库可写（见 Settings → Actions → Workflow permissions）
+          token: ${{ github.token }}
+
+      - name: Configure git
+        run: |
+          git config user.name  "upstream-sync[bot]"
+          git config user.email "upstream-sync@users.noreply.github.com"
+
+      - name: Fetch upstream
+        run: |
+          git remote add upstream https://github.com/zyl6932/HyperMusicCover.git   # 默认分支是 main
+          git fetch --no-tags upstream main
+
+      - name: Merge upstream/main
+        id: merge
+        run: |
+          if git merge-base --is-ancestor upstream/main HEAD; then
+            echo "已是最新，无需合并"
+            echo "merged=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if git merge --no-edit upstream/main; then
+            echo "merged=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::与上游冲突，需要手动解决：git fetch upstream && git merge upstream/main"
+            git merge --abort || true
+            exit 1
+          fi
+
+      - name: Push
+        if: steps.merge.outputs.merged == 'true'
+        run: git push origin HEAD:${{ inputs.branch || 'hybrid' }}
+
+      - name: Summary
+        run: |
+          {
+            echo "### 上游同步"
+            echo ""
+            echo "- 分支：\`${{ inputs.branch || 'hybrid' }}\`"
+            echo "- 结果：${{ steps.merge.outputs.merged == 'true' && '已合并上游更新' || '已是最新' }}"
+            echo "- 上游最新提交：\`$(git rev-parse --short upstream/main)\`"
+          } >> "$GITHUB_STEP_SUMMARY"
