@@ -132,6 +132,12 @@ public final class SettingSpec {
     public static final SettingSpec LYRIC_ONLINE = bool("lyriconline", true);
     /** 0 left, 1 centre, 2 right. */
     public static final SettingSpec LYRIC_ALIGN = integer("lyricalign", 0, 0, 2);
+    /**
+     * Frame budget of the lyric animation in fps. The lyric view repaints every display frame,
+     * glow and blur masks included: on a 120Hz panel that is most of a SystemUI core while the
+     * lock screen shows lyrics, and 60fps halves it with no visible change in the scroll.
+     */
+    public static final SettingSpec LYRIC_FPS = integer("lyricfps", 60, 30, 120);
     /** The lead's and the backing vocal's size, in sp. */
     public static final SettingSpec LYRIC_SIZE = real("lyricsize", 25f);
     public static final SettingSpec LYRIC_BG_SIZE = real("lyricbgsize", 17f);
